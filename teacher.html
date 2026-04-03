@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Учительская | Управление тестами</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: system-ui, 'Segoe UI', sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #1e2a44 0%, #2c3e66 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1300px;
+            margin: 0 auto;
+        }
+
+        .login-box, .admin-panel {
+            background: white;
+            border-radius: 32px;
+            padding: 40px;
+            max-width: 500px;
+            margin: 100px auto;
+            text-align: center;
+        }
+
+        .admin-panel {
+            max-width: 1300px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: white;
+            border-radius: 32px;
+            padding: 28px 30px;
+            box-shadow: 0 20px 35px -12px rgba(0,0,0,0.2);
+            margin-bottom: 30px;
+        }
+
+        h2 {
+            color: #1f2b48;
+            margin-bottom: 20px;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #cfdfed;
+            border-radius: 20px;
+            margin-bottom: 15px;
+        }
+
+        button {
+            background: #2c3e66;
+            color: white;
+            border: none;
+            padding: 12px 28px;
+            border-radius: 40px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        button:hover {
+            background: #1f2b48;
+        }
+
+        .btn-danger { background: #e56a6a; }
+        .btn-outline { background: transparent; border: 1px solid #2c3e66; color: #2c3e66; }
+        .btn-outline:hover { background: #2c3e66; color: white; }
+
+        .question-item {
+            background: #f9fbfe;
+            border-radius: 24px;
+            padding: 18px;
+            margin-bottom: 15px;
+            border: 1px solid #e2ebf3;
+        }
+
+        .answer-input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 8px;
+            align-items: center;
+        }
+
+        .answer-input-group input { margin-bottom: 0; }
+
+        .questions-list {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+<div class="container" id="app"></div>
+
+<script>
+    const PASSWORD = "teacher123"; // Пароль для входа
+
+    let questionsBank = [];
+
+    function saveToStorage() {
+        localStorage.setItem('quizQuestions', JSON.stringify(questionsBank));
+    }
+
+    function loadFromStorage() {
+        const saved = localStorage.getItem('quizQuestions');
+        if (saved) {
+            try {
+                questionsBank = JSON.parse(saved);
+            } catch(e) { questionsBank = []; }
+        }
+        if (questionsBank.length === 0) {
+            questionsBank = [
+                {
+                    text: "Какой язык используется для стилизации веб-страниц?",
+                    answers: [
+                        { text: "HTML", isCorrect: false },
+                        { text: "CSS", isCorrect: true },
+                        { text: "JavaScript", isCorrect: false }
+                    ]
+                },
+                {
+                    text: "Какое расширение у файла JavaScript?",
+                    answers: [
+                        { text: ".html", isCorrect: false },
+                        { text: ".css", isCorrect: false },
+                        { text: ".js", isCorrect: true }
+                    ]
+                }
+            ];
+            saveToStorage();
+        }
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/[&<>]/g, function(m) {
+            return m === '&' ? '&amp;' : (m === '<' ? '&lt;' : '&gt;');
+        });
+    }
+
+    function addAnswerRow(container, answerText = '', isCorrect = false) {
+        const div = document.createElement('div');
+        div.className = 'answer-input-group';
+        div.innerHTML = `
+            <input type="text" class="answer-text" placeholder="Вариант ответа" value="${escapeHtml(answerText)}" style="flex:1;">
+            <label><input type="checkbox" class="answer-correct" ${isCorrect ? 'checked' : ''}> Правильный</label>
+            <button type="button" class="remove-answer" style="background:#ccc;padding:8px 12px;">✖</button>
+        `;
+        container.appendChild(div);
+        div.querySelector('.remove-answer').onclick = () => div.remove();
+    }
+
+    function renderAdminPanel() {
+        const app = document.getElementById('app');
+        app.innerHTML = `
+            <div class="admin-panel">
+                <div class="card">
+                    <h2>📚 Управление вопросами</h2>
+                    <div style="background:#eef2fa;border-radius:24px;padding:20px;margin-bottom:30px;">
+                        <h3>➕ Новый вопрос</h3>
+                        <input type="text" id="questionText" placeholder="Текст вопроса">
+                        <div id="answersContainer"></div>
+                        <div style="display:flex;gap:12px;margin-top:15px;">
+                            <button id="addAnswerBtn" class="btn-outline">➕ Добавить вариант</button>
+                            <button id="saveQuestionBtn">💾 Сохранить вопрос</button>
+                        </div>
+                    </div>
+                    <h3>📋 Список вопросов (${questionsBank.length})</h3>
+                    <div id="questionsList" class="questions-list"></div>
+                    <div style="display:flex;gap:15px;justify-content:flex-end;margin-top:20px;">
+                        <button id="clearAllBtn" class="btn-danger">🗑 Удалить все</button>
+                        <button id="logoutBtn" class="btn-outline">🚪 Выйти</button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        const answersContainer = document.getElementById('answersContainer');
+        addAnswerRow(answersContainer, '', false);
+        addAnswerRow(answersContainer, '', false);
+
+        function refreshList() {
+            const container = document.getElementById('questionsList');
+            if (!container) return;
+            if (questionsBank.length === 0) {
+                container.innerHTML = '<div style="text-align:center;padding:40px;">📭 Нет вопросов</div>';
+                return;
+            }
+            container.innerHTML = questionsBank.map((q, idx) => `
+                <div class="question-item">
+                    <div style="font-weight:700;margin-bottom:12px;">${escapeHtml(q.text)}</div>
+                    <div style="margin-left:20px;">
+                        ${q.answers.map(a => `<div>${escapeHtml(a.text)} ${a.isCorrect ? '✅' : ''}</div>`).join('')}
+                    </div>
+                    <div style="margin-top:12px;">
+                        <button class="delete-q" data-index="${idx}" style="background:#d9534f;">🗑 Удалить</button>
+                    </div>
+                </div>
+            `).join('');
+            document.querySelectorAll('.delete-q').forEach(btn => {
+                btn.onclick = () => {
+                    if (confirm('Удалить вопрос?')) {
+                        questionsBank.splice(parseInt(btn.dataset.index), 1);
+                        saveToStorage();
+                        refreshList();
+                    }
+                };
+            });
+        }
+
+        document.getElementById('addAnswerBtn').onclick = () => addAnswerRow(answersContainer, '', false);
+        document.getElementById('saveQuestionBtn').onclick = () => {
+            const text = document.getElementById('questionText').value.trim();
+            if (!text) { alert('Введите вопрос'); return; }
+            const rows = document.querySelectorAll('#answersContainer .answer-input-group');
+            if (rows.length < 2) { alert('Добавьте минимум 2 варианта'); return; }
+            const answers = [];
+            let hasCorrect = false;
+            for (let row of rows) {
+                const ansText = row.querySelector('.answer-text').value.trim();
+                const isCorrect = row.querySelector('.answer-correct').checked;
+                if (!ansText) continue;
+                answers.push({ text: ansText, isCorrect });
+                if (isCorrect) hasCorrect = true;
+            }
+            if (answers.length < 2) { alert('Заполните варианты'); return; }
+            if (!hasCorrect) { alert('Выберите правильный ответ'); return; }
+            questionsBank.push({ text, answers });
+            saveToStorage();
+            document.getElementById('questionText').value = '';
+            answersContainer.innerHTML = '';
+            addAnswerRow(answersContainer, '', false);
+            addAnswerRow(answersContainer, '', false);
+            refreshList();
+            alert('Вопрос сохранён!');
+        };
+        document.getElementById('clearAllBtn').onclick = () => {
+            if (confirm('Удалить все вопросы?')) {
+                questionsBank = [];
+                saveToStorage();
+                refreshList();
+            }
+        };
+        document.getElementById('logoutBtn').onclick = () => {
+            sessionStorage.removeItem('teacherLoggedIn');
+            renderLogin();
+        };
+        refreshList();
+    }
+
+    function renderLogin() {
+        document.getElementById('app').innerHTML = `
+            <div class="login-box">
+                <h2>👨‍🏫 Вход для учителя</h2>
+                <input type="password" id="password" placeholder="Введите пароль">
+                <button id="loginBtn">Войти</button>
+                <p style="margin-top:15px;color:#666;">Пароль: teacher123</p>
+            </div>
+        `;
+        document.getElementById('loginBtn').onclick = () => {
+            if (document.getElementById('password').value === PASSWORD) {
+                sessionStorage.setItem('teacherLoggedIn', 'true');
+                renderAdminPanel();
+            } else {
+                alert('Неверный пароль!');
+            }
+        };
+    }
+
+    if (sessionStorage.getItem('teacherLoggedIn')) {
+        loadFromStorage();
+        renderAdminPanel();
+    } else {
+        renderLogin();
+    }
+</script>
+</body>
+</html>

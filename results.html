@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Результаты тестирования</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: system-ui, 'Segoe UI', sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #1e2a44 0%, #2c3e66 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1300px;
+            margin: 0 auto;
+        }
+
+        .login-box, .results-panel {
+            background: white;
+            border-radius: 32px;
+            padding: 40px;
+            max-width: 500px;
+            margin: 100px auto;
+            text-align: center;
+        }
+
+        .results-panel {
+            max-width: 1300px;
+            margin: 0 auto;
+            text-align: left;
+        }
+
+        h2 {
+            color: #1f2b48;
+            margin-bottom: 20px;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #cfdfed;
+            border-radius: 20px;
+            margin-bottom: 15px;
+        }
+
+        button {
+            background: #2c3e66;
+            color: white;
+            border: none;
+            padding: 12px 28px;
+            border-radius: 40px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 24px;
+            text-align: center;
+        }
+
+        .stat-card .number {
+            font-size: 2rem;
+            font-weight: bold;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e2ebf3;
+        }
+
+        th {
+            background: #f0f4ff;
+        }
+
+        .search-box {
+            margin-bottom: 20px;
+        }
+
+        .btn-danger { background: #e56a6a; }
+        .btn-outline { background: transparent; border: 1px solid #2c3e66; color: #2c3e66; }
+        .btn-outline:hover { background: #2c3e66; color: white; }
+    </style>
+</head>
+<body>
+<div class="container" id="app"></div>
+
+<script>
+    const PASSWORD = "teacher123";
+
+    function renderLogin() {
+        document.getElementById('app').innerHTML = `
+            <div class="login-box">
+                <h2>📊 Просмотр результатов</h2>
+                <input type="password" id="password" placeholder="Введите пароль">
+                <button id="loginBtn">Войти</button>
+                <p style="margin-top:15px;color:#666;">Пароль: teacher123</p>
+            </div>
+        `;
+        document.getElementById('loginBtn').onclick = () => {
+            if (document.getElementById('password').value === PASSWORD) {
+                sessionStorage.setItem('resultsLoggedIn', 'true');
+                renderResults();
+            } else {
+                alert('Неверный пароль!');
+            }
+        };
+    }
+
+    function renderResults() {
+        const results = JSON.parse(localStorage.getItem('testResults') || '[]');
+        const searchTerm = document.getElementById('searchInput')?.value.toLowerCase() || '';
+        
+        const filtered = results.filter(r => 
+            r.fullName.toLowerCase().includes(searchTerm) ||
+            r.surname.toLowerCase().includes(searchTerm) ||
+            r.name.toLowerCase().includes(searchTerm)
+        );
+        
+        const totalStudents = results.length;
+        const avgPercent = totalStudents > 0 ? Math.round(results.reduce((s, r) => s + r.percent, 0) / totalStudents) : 0;
+        const bestResult = totalStudents > 0 ? Math.max(...results.map(r => r.percent)) : 0;
+        
+        document.getElementById('app').innerHTML = `
+            <div class="results-panel">
+                <h2>📊 Результаты тестирований</h2>
+                
+                <div class="stats">
+                    <div class="stat-card"><div class="number">${totalStudents}</div><div>Всего тестирований</div></div>
+                    <div class="stat-card"><div class="number">${avgPercent}%</div><div>Средний результат</div></div>
+                    <div class="stat-card"><div class="number">${bestResult}%</div><div>Лучший результат</div></div>
+                </div>
+                
+                <div class="search-box">
+                    <input type="text" id="searchInput" placeholder="🔍 Поиск по фамилии, имени...">
+                </div>
+                
+                <div style="overflow-x:auto;">
+                    <table>
+                        <thead>
+                            <tr><th>Дата</th><th>ФИО</th><th>Результат</th><th>Процент</th><th></th></tr>
+                        </thead>
+                        <tbody id="resultsBody"></tbody>
+                    </table>
+                </div>
+                
+                <div style="display:flex;gap:15px;justify-content:flex-end;margin-top:25px;">
+                    <button id="exportBtn" class="btn-outline">📎 Экспорт CSV</button>
+                    <button id="logoutBtn" class="btn-outline">🚪 Выйти</button>
+                </div>
+            </div>
+        `;
+        
+        const tbody = document.getElementById('resultsBody');
+        if (filtered.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">📭 Нет результатов</td></tr>';
+        } else {
+            tbody.innerHTML = filtered.map(r => `
+                <tr>
+                    <td>${escapeHtml(r.date)}</td>
+                    <td>${escapeHtml(r.fullName)}</td>
+                    <td>${r.correct} / ${r.total}</td>
+                    <td><strong>${r.percent}%</strong></td>
+                    <td><button class="delete-result" data-id="${r.id}" style="background:#d9534f;padding:5px 12px;">🗑</button></td>
+                </tr>
+            `).join('');
+        }
+        
+        document.querySelectorAll('.delete-result').forEach(btn => {
+            btn.onclick = () => {
+                if (confirm('Удалить результат?')) {
+                    const newResults = results.filter(r => r.id !== parseInt(btn.dataset.id));
+                    localStorage.setItem('testResults', JSON.stringify(newResults));
+                    renderResults();
+                }
+            };
+        });
+        
+        document.getElementById('searchInput').oninput = () => renderResults();
+        document.getElementById('exportBtn').onclick = () => exportCSV(results);
+        document.getElementById('logoutBtn').onclick = () => {
+            sessionStorage.removeItem('resultsLoggedIn');
+            renderLogin();
+        };
+    }
+    
+    function exportCSV(results) {
+        if (results.length === 0) { alert('Нет данных'); return; }
+        let csv = "Дата,ФИО,Правильные,Всего,Процент\n";
+        results.forEach(r => {
+            csv += `"${r.date}","${r.fullName}",${r.correct},${r.total},${r.percent}\n`;
+        });
+        const blob = new Blob([csv], {type: 'text/csv'});
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'results.csv';
+        link.click();
+        URL.revokeObjectURL(link.href);
+    }
+    
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/[&<>]/g, m => m === '&' ? '&amp;' : (m === '<' ? '&lt;' : '&gt;'));
+    }
+    
+    if (sessionStorage.getItem('resultsLoggedIn')) {
+        renderResults();
+    } else {
+        renderLogin();
+    }
+</script>
+</body>
+</html>
